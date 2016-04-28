@@ -28,50 +28,70 @@ static double angle( Point pt1, Point pt2, Point pt0 )
 
 static void findsquare( const Mat& image, vector<vector<Point> >& square )
 {
-    int thresh = 10;
+    int thresh = 50;
     square.clear();
     
-    Mat pyr, timg, gray;
+    Mat gray;
     Mat gray0(image.size(), CV_8U);
     
     vector<vector<Point> > contours;
     
     for( int c = 0; c < 3; c++ )
     {
-        int ch[] = {c, 0};
+        int ch[ ] = {c, 0};
         mixChannels(&image, 1, &gray0, 1, ch, 1);
         
         Canny(gray0, gray, 0, thresh, 5);
+//        imshow("canny", gray);
         dilate(gray, gray, Mat(), Point(-1,-1));
+//        imshow("dilate", gray);
         
         findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
         
         vector<Point> approx;
+        double minCos = 1;
+        vector<Point> sq;
         
         for( size_t i = 0; i < contours.size(); i++ )
         {
             approxPolyDP(Mat(contours[i]), approx, arcLength(Mat(contours[i]), true)*0.02, true);
             if( approx.size() == 4 &&
-               fabs(contourArea(Mat(approx))) > 20000 &&
+               fabs(contourArea(Mat(approx))) > 10000 &&
                isContourConvex(Mat(approx)) )
             {
                 double maxCosine = 0;
-                
+                vector<double> dist;
+                dist.push_back(norm(approx[0]-approx[1]));
+                dist.push_back(norm(approx[1]-approx[2]));
+                dist.push_back(norm(approx[2]-approx[3]));
+                dist.push_back(norm(approx[3]-approx[1]));
+                double mean = (dist[0]+dist[1]+dist[2]+dist[3])/4;
+                bool flag = true;
+                for (int i = 0; i < 4; i++) {
+//                    cout<<dist[i]<<"      "<<mean<<"      "<<fabs(dist[i]-mean)/mean<<endl;
+                    if (fabs(dist[i]-mean)/mean > 0.3) flag = false;
+                }
                 for( int j = 2; j < 5; j++ )
                 {
                     double cosine = fabs(angle(approx[j%4], approx[j-2], approx[j-1]));
                     maxCosine = MAX(maxCosine, cosine);
                 }
-                if( maxCosine < 0.3 )
+//                if (maxCosine < minCos) {
+//                  sq = approx;
+//                }
+                if(flag && maxCosine < 0.3)
                 {
                     square.push_back(approx);
                 }
             }
         }
+//        if (sq.size()) {
+//            square.push_back(sq);
+//        }
     }
-    if (square.size() != 1) {
-        square.clear();
-    }
+        if (square.size() != 1) {
+            square.clear();
+        }
 }
 
 static void drawsquare( Mat& image, const vector<vector<Point> >& square )
@@ -128,7 +148,7 @@ vector<int> ColorDetect(Mat img, vector<Point> squares) {
         Vec3b hsv = imgHSV.at<Vec3b>(squares[i].y, squares[i].x);
         int h = hsv.val[0] * 2;
         double s = hsv.val[1] / 255.0;
-        double v = hsv.val[2] / 255.0;
+//        double v = hsv.val[2] / 255.0;
         //int h = imgHSV.at<Vec3b>(squares[i].y, squares[i].x).val[0];
         //int s = imgHSV.at<Vec3b>(squares[i].y, squares[i].x).val[1];
         //int v = imgHSV.at<Vec3b>(squares[i].y, squares[i].x).val[2];
@@ -286,7 +306,7 @@ int main(int argc, char** argv)
 //                cout<<square[0][i].x<<","<<square[0][i].y<<endl;
 //            }
             for (int i = 0; i < cells.size(); i++) {
-                cout<<cells[i].x<<","<<cells[i].y<<endl;
+//                cout<<cells[i].x<<","<<cells[i].y<<endl;
                 switch(temp[i]) {
                     case YELLOW:
                         circle(frame, cells[i] - Point(200, 0), 10, Scalar(0,255,255), CV_FILLED);
@@ -337,7 +357,34 @@ int main(int argc, char** argv)
                         break;
                 }
             }
-            
+            for(int i = 0; i < 9; i++)
+            {
+                switch(temp_ordered[i])
+                {
+                    case 4:
+                        cout << "YELLOW ";
+                        break;
+                    case 3:
+                        cout << "GREEN ";
+                        break;
+                    case 5:
+                        cout << "RED";
+                        break;
+                    case 1:
+                        cout << "ORANGE";
+                        break;
+                    case 0:
+                        cout << "WHITE";
+                        break;
+                    case 2:
+                        cout << "BLUE";
+                        break;
+                }
+                
+                if (i%3 == 2) {
+                    cout<<endl;
+                }else cout<<"    ";
+            }
 
             
             //while 'y' not pressed, wait for verification
@@ -359,31 +406,8 @@ int main(int argc, char** argv)
 //                    for (int i = 0; i < temp_ordered.size(); i++) {
 //                        temp_ordered[i] = temp_ordered[8-i];
 //                    }
-                    cout<<temp[4]<<endl;
-                    for(int i = 0; i < 9; i++)
-                    {
-                        switch(temp_ordered[i])
-                        {
-                            case 4:
-                                cout << "YELLOW" << endl;
-                                break;
-                            case 3:
-                                cout << "GREEN" << endl;
-                                break;
-                            case 5:
-                                cout << "RED" << endl;
-                                break;
-                            case 1:
-                                cout << "ORANGE" << endl;
-                                break;
-                            case 0:
-                                cout << "WHITE" << endl;
-                                break;
-                            case 2:
-                                cout << "BLUE" << endl;
-                                break;
-                        }
-                    }
+//                    cout<<temp[4]<<endl;
+                   
                     
                     cell_colors[temp[4]] = temp_ordered;
                 
@@ -403,8 +427,8 @@ int main(int argc, char** argv)
     cout<<"end capture\n";
     destroyAllWindows();
     
-    cout<<"animation\n";
-    vector<int> tmp = cell_colors[0];
+//    cout<<"animation\n";
+//    vector<int> tmp = cell_colors[0];
 //    cell_colors[0] = {tmp[2], tmp[5], tmp[8], tmp[1], tmp[4], tmp[7], tmp[0], tmp[3], tmp[6]};
 //    for (int k = 0; k < 6; k++) {
 //        for(int i = 0; i < 9; ++i) {
